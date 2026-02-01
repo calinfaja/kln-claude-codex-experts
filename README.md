@@ -1,58 +1,89 @@
-Leave a star ⭐ if you like it 😘
+# Codex Experts - Expert Delegation for Claude Code
 
-# Codex Integration for Claude Code
+Extends the [skill-codex](https://github.com/skills-directory/skill-codex) skill with expert delegation. Routes tasks to specialized personas that run as Codex sessions with tuned reasoning effort and structured output.
 
-<img width="2288" height="808" alt="skillcodex" src="https://github.com/user-attachments/assets/85336a9f-4680-479e-b3fe-d6a68cadc051" />
+## Experts
 
+| Expert | What It Does | Reasoning |
+|--------|-------------|-----------|
+| **Architect** | System design, tradeoff analysis, component boundaries | high |
+| **Code Reviewer** | Code quality review: Correctness > Security > Performance > Maintainability | medium |
+| **Security Analyst** | 8-point OWASP checklist, threat modeling, vulnerability assessment | xhigh |
+| **Plan Reviewer** | Validates implementation plans before code is written | medium |
+| **Scope Analyst** | Pre-planning ambiguity detection, requirement decomposition | medium |
+| **Simplifier** | Proposes simplifications without making changes (advisory only) | medium |
+| **Implementer** | Executes well-defined tasks: code, tests, verification, commit-ready | high |
 
-## Purpose
-Enable Claude Code to invoke the Codex CLI (`codex exec` and session resumes) for automated code analysis, refactoring, and editing workflows.
+## Quick Install
 
-## Prerequisites
-- `codex` CLI installed and available on `PATH`.
-- Codex configured with valid credentials and settings.
-- Confirm the installation by running `codex --version`; resolve any errors before using the skill.
+Paste this into Claude Code:
 
-## Installation
+> Fetch and follow the instructions from https://raw.githubusercontent.com/calinfaja/kln-claude-codex-experts/main/INSTALL.md
 
-Download this repo and store the skill in ~/.claude/skills/codex
+That's it. Claude will clone the repo and set up the skill.
 
-```
-git clone --depth 1 git@github.com:skills-directory/skill-codex.git /tmp/skills-temp && \
+### Manual Install
+
+```bash
+git clone --depth 1 https://github.com/calinfaja/kln-claude-codex-experts.git /tmp/skill-codex-experts && \
 mkdir -p ~/.claude/skills && \
-cp -r /tmp/skills-temp/ ~/.claude/skills/codex && \
-rm -rf /tmp/skills-temp
+cp -r /tmp/skill-codex-experts/ ~/.claude/skills/codex-experts && \
+rm -rf /tmp/skill-codex-experts
 ```
+
+### Prerequisites
+
+- `codex` CLI installed and on `PATH` ([OpenAI Codex CLI](https://github.com/openai/codex))
+- Codex configured with valid credentials
+- Verify: `codex --version`
 
 ## Usage
 
-### Important: Thinking Tokens
-By default, this skill suppresses thinking tokens (stderr output) using `2>/dev/null` to avoid bloating Claude Code's context window. If you want to see the thinking tokens for debugging or insight into Codex's reasoning process, explicitly ask Claude to show them.
+Expert routing is automatic based on your prompt:
 
-### Example Workflow
-
-**User prompt:**
 ```
-Use codex to analyze this repository and suggest improvements for my claude code skill.
+# Routes to security-analyst (xhigh reasoning)
+"Use codex to review the auth module for security issues"
+
+# Routes to architect (high reasoning)
+"Ask the architect about our database schema design"
+
+# Routes to code-reviewer with implementation mode
+"Review and fix the performance issues in utils.py"
+
+# Routes to scope-analyst
+"Analyze the scope of this feature request before we plan"
+
+# Routes to simplifier (advisory only, no changes)
+"Use codex to find what can be simplified in src/utils/"
+
+# Routes to implementer (workspace-write)
+"Use codex to implement the caching layer from the plan"
+
+# No expert match - plain codex mode
+"Use codex to refactor the logging module"
 ```
 
-**Claude Code response:**
-Claude will activate the Codex skill and:
-1. Ask which model to use (`gpt-5` or `gpt-5-codex`) unless already specified in your prompt.
-2. Ask which reasoning effort level (`low`, `medium`, or `high`) unless already specified in your prompt.
-3. Select appropriate sandbox mode (defaults to `read-only` for analysis)
-4. Run a command like:
-```bash
-codex exec -m gpt-5-codex \
-  --config model_reasoning_effort="high" \
-  --sandbox read-only \
-  --full-auto \
-  --skip-git-repo-check \
-  "Analyze this Claude Code skill repository comprehensively..." 2>/dev/null
-```
+### Thinking Tokens
 
-**Result:**
-Claude will summarize the Codex analysis output, highlighting key suggestions and asking if you'd like to continue with follow-up actions.
+Thinking tokens (stderr) are suppressed by default with `2>/dev/null`. Ask Claude to show them if you need to debug Codex's reasoning.
 
-### Detailed Instructions
-See `SKILL.md` for complete operational instructions, CLI options, and workflow guidance.
+### Session Resume
+
+Say "codex resume" to continue the last session. The resumed session inherits its original model, reasoning, and sandbox settings.
+
+### Switch Expert
+
+Ask for a different expert's perspective on the same topic. Claude will start a new session with the new expert's prompt and carry forward relevant context.
+
+## Credits
+
+- [skill-codex](https://github.com/skills-directory/skill-codex) - Original Codex skill
+- [claude-delegator](https://github.com/jarrodwatts/claude-delegator) by [@jarrodwatts](https://github.com/jarrodwatts) - Expert delegation patterns
+- [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode) by [@code-yeongyu](https://github.com/code-yeongyu) - Scope analyst and plan reviewer frameworks
+- [claude-plugins-official](https://github.com/anthropics/claude-plugins-official) - Anthropic's code-simplifier agent (adapted as advisory-only simplifier)
+- [superpowers](https://github.com/obra/superpowers) by [@obra](https://github.com/obra) - Implementer subagent pattern from subagent-driven-development
+
+## License
+
+MIT - see [LICENSE](LICENSE).
