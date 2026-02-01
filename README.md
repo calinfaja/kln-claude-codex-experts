@@ -1,6 +1,14 @@
 # Codex Experts - Expert Delegation for Claude Code
 
-Extends the [skill-codex](https://github.com/skills-directory/skill-codex) skill with expert delegation. Routes tasks to specialized personas that run as Codex sessions with tuned reasoning effort and structured output.
+Run expert analysis (security audits, architecture reviews, code reviews) through OpenAI Codex **without bloating Claude's context**. Claude routes the task, Codex does the heavy lifting in its own 192k context window with full repo access, and only the structured summary comes back.
+
+### Why this matters
+
+- **Zero context cost**: Codex runs as a separate process. Its output stays in a Task subagent — your Claude conversation stays clean.
+- **Full codebase access**: Codex reads your repo directly via its sandbox. No need to paste files or reference paths — it explores on its own.
+- **Expert-tuned reasoning**: Each expert runs with calibrated reasoning effort (security=xhigh, architecture=high, reviews=medium) so you're not overpaying for simple tasks.
+- **Two models, best of both**: Claude orchestrates (conversation-aware routing), Codex executes (deep analysis with its own tool use and web search).
+- **Full Codex features**: `codex exec` reads your `~/.codex/config.toml` — MCP servers, feature flags, profiles, `AGENTS.md`, web search all work. If you've configured Codex with extra tools (DB explorers, Jira, Sentry, etc.), experts get them automatically.
 
 ## Experts
 
@@ -62,6 +70,28 @@ Expert routing is automatic based on your prompt:
 
 # No expert match - plain codex mode
 "Use codex to refactor the logging module"
+```
+
+### How It Works
+
+```
+You ── "review auth for security" ──> Claude Code (sees your conversation)
+                                          |
+                                     Routes to security-analyst
+                                     Reads expert prompt (~700 tokens)
+                                          |
+                                     Dispatches via Task tool (subagent)
+                                          |
+                                     codex exec (separate process)
+                                       - Own 192k context window
+                                       - Full repo access in sandbox
+                                       - Expert prompt shapes analysis
+                                       - Web search available
+                                          |
+                                     Returns structured findings
+                                          |
+Claude Code <── synthesized summary ──────┘
+  (only the summary enters your context)
 ```
 
 ### Thinking Tokens
