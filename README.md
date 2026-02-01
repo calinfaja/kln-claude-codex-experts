@@ -21,6 +21,7 @@ Run expert analysis (security audits, architecture reviews, code reviews) throug
 | **Scope Analyst** | Pre-planning ambiguity detection, requirement decomposition | medium |
 | **Simplifier** | Proposes simplifications without making changes (advisory only) | medium |
 | **Implementer** | Executes well-defined tasks: code, tests, verification, commit-ready | high |
+| **Researcher** | Deep codebase exploration: file paths, signatures, call graphs, dependency maps | high |
 
 ## Quick Install
 
@@ -67,6 +68,9 @@ Expert routing is automatic based on your prompt:
 
 # Routes to implementer (workspace-write)
 "Use codex to implement the caching layer from the plan"
+
+# Routes to researcher (read-only, returns structured report)
+"Use codex to find how authenticate() is called and map the auth flow"
 
 # No expert match - plain codex mode
 "Use codex to refactor the logging module"

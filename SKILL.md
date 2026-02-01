@@ -1,11 +1,11 @@
 ---
 name: codex-experts
-description: Use when the user asks to run Codex CLI, delegate to an expert (architect, security, reviewer, simplifier, implementer), or references OpenAI Codex for code analysis, refactoring, security review, simplification, or automated editing. Triggers on codex, delegate, ask architect, review security, analyze scope, review plan, simplify, implement.
+description: Use when the user asks to run Codex CLI, delegate to an expert (architect, security, reviewer, simplifier, implementer, researcher), or references OpenAI Codex for code analysis, codebase exploration, refactoring, security review, simplification, or automated editing. Triggers on codex, delegate, ask architect, review security, analyze scope, review plan, simplify, implement, explore codebase, find how X is used.
 ---
 
 # Codex Experts Skill
 
-Extends Codex CLI with expert delegation. Routes tasks to specialized personas (architect, code-reviewer, security-analyst, plan-reviewer, scope-analyst, simplifier, implementer) that run as Codex sessions with tuned reasoning and structured output.
+Extends Codex CLI with expert delegation. Routes tasks to specialized personas (architect, code-reviewer, security-analyst, plan-reviewer, scope-analyst, simplifier, implementer, researcher) that run as Codex sessions with tuned reasoning and structured output.
 
 ## Expert Routing Table
 
@@ -20,6 +20,7 @@ Match the user's task against these patterns. If no expert matches, run plain Co
 | `scope-analyst` | scope, requirements, ambiguity, pre-planning, analyze request, what's missing | medium | read-only |
 | `simplifier` | simplify, reduce complexity, clean up, redundant, over-engineered | medium | read-only |
 | `implementer` | implement task, build feature, execute plan, write the code, do the work | high | workspace-write |
+| `researcher` | explore codebase, find files, trace function, map dependencies, gather context, how is X used | high | read-only |
 
 **Sandbox override**: If the user says "fix", "implement", "apply", or "change" -> use `workspace-write` instead of `read-only`. Exception: `simplifier` stays `read-only` (advisory only, never modifies code).
 
@@ -142,7 +143,12 @@ If user wants a different expert's take on the same topic:
 **Route**: `implementer` (triggers: "implement", "plan")
 **Action**: Read `references/experts/implementer.md`, combine with task, run with reasoning=high, sandbox=workspace-write
 
-### 7. Plain Codex (No Expert)
+### 7. Codebase Research
+**User**: "Use codex to find how authenticate() is called across the codebase, what files import it, and map the auth flow"
+**Route**: `researcher` (triggers: "find", "how is X used", "map")
+**Action**: Read `references/experts/researcher.md`, combine with task, run with reasoning=high, sandbox=read-only. Returns structured report with file paths, line numbers, signatures, and call graph.
+
+### 8. Plain Codex (No Expert)
 **User**: "Use codex to refactor the logging module"
 **Route**: No expert match (general refactoring)
 **Action**: Ask model + reasoning, run plain codex exec with user prompt
