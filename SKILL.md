@@ -70,11 +70,13 @@ Task tool:
   description: "Codex {expert-name}: {short task summary}"
   prompt: |
     Run this command and return the full output:
-    echo "{combined_prompt}" | codex exec -m {model} \
+    cat << 'CODEX_PROMPT_EOF' | codex exec -m {model} \
       --config model_reasoning_effort="{effort}" \
       --sandbox {sandbox_mode} \
       --full-auto \
       --skip-git-repo-check 2>/dev/null
+    {combined_prompt}
+    CODEX_PROMPT_EOF
 ```
 
 Always use `--skip-git-repo-check`. Always append `2>/dev/null` to suppress thinking tokens unless user requests them.
@@ -94,14 +96,16 @@ When no expert matches, fall back to original behavior:
 
 1. Ask model + reasoning effort via `AskUserQuestion` (single prompt, two questions)
 2. Select sandbox mode for the task (default: `read-only`)
-3. Run: `codex exec -m {model} --config model_reasoning_effort="{effort}" --sandbox {mode} --full-auto --skip-git-repo-check "{user_prompt}" 2>/dev/null`
+3. Run: `cat << 'CODEX_PROMPT_EOF' | codex exec -m {model} --config model_reasoning_effort="{effort}" --sandbox {mode} --full-auto --skip-git-repo-check 2>/dev/null` followed by the prompt content and `CODEX_PROMPT_EOF` on its own line
 4. Summarize output and offer resume
 
 ## Session Management
 
 ### Resume
 ```bash
-echo "{prompt}" | codex exec --skip-git-repo-check resume --last 2>/dev/null
+cat << 'CODEX_PROMPT_EOF' | codex exec --skip-git-repo-check resume --last 2>/dev/null
+{prompt}
+CODEX_PROMPT_EOF
 ```
 No config flags on resume unless user explicitly specifies model or reasoning. The resumed session inherits its original settings.
 
