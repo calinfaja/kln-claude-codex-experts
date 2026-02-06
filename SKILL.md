@@ -40,7 +40,7 @@ Follow these steps to build and execute a Codex command:
 ### Step 1: Determine Parameters
 
 1. **Expert**: Match task against routing table. If ambiguous, ask using `AskUserQuestion` with the top 2 candidates.
-2. **Model**: Ask the user which model (`gpt-5.2-codex` or `gpt-5`) unless already specified. `gpt-5.2-codex` is optimized for agentic coding tasks; `gpt-5` is the general-purpose model. Use a single `AskUserQuestion` prompt combining model + reasoning effort if the expert's defaults aren't overridden.
+2. **Model**: Default to `gpt-5.3-codex` unless the user specifies a different model. Available models: `gpt-5.3-codex` (latest, recommended), `gpt-5.2-codex`, `gpt-5`. Only ask the user if they haven't specified a preference.
 3. **Reasoning effort**: Use the expert's default from the routing table. Override only if user specifies.
 4. **Sandbox**: Use routing table default. Override to `workspace-write` if implementation mode detected.
 
@@ -64,20 +64,23 @@ Construct the Codex input by combining:
 
 Dispatch the codex command using the **Task tool** (`subagent_type: Bash`). This runs in a subagent so codex output stays isolated from the main conversation.
 
+**IMPORTANT**: Pass the prompt as a positional argument (single-quoted), NOT via heredoc (`<<'EOF'`) or pipe (`cat ... |`). Heredoc and pipe syntax cause the `Bash(codex:*)` permission pattern to fail in background subagents because the permission matcher sees `cat` or the multi-line heredoc delimiter as the command, not `codex`.
+
 ```
 Task tool:
   subagent_type: Bash
   description: "Codex {expert-name}: {short task summary}"
   prompt: |
     Run this command and return the full output:
-    cat << 'CODEX_PROMPT_EOF' | codex exec -m {model} \
+    codex exec -m {model} \
       --config model_reasoning_effort="{effort}" \
       --sandbox {sandbox_mode} \
       --full-auto \
-      --skip-git-repo-check 2>/dev/null
-    {combined_prompt}
-    CODEX_PROMPT_EOF
+      --skip-git-repo-check \
+      '{combined_prompt}' 2>/dev/null
 ```
+
+If the prompt contains single quotes, escape them as `'\''` or write the prompt to a temp file first, then use `"$(cat /tmp/codex-prompt.txt)"` as the argument.
 
 Always use `--skip-git-repo-check`. Always append `2>/dev/null` to suppress thinking tokens unless user requests them.
 
@@ -96,16 +99,14 @@ When no expert matches, fall back to original behavior:
 
 1. Ask model + reasoning effort via `AskUserQuestion` (single prompt, two questions)
 2. Select sandbox mode for the task (default: `read-only`)
-3. Run: `cat << 'CODEX_PROMPT_EOF' | codex exec -m {model} --config model_reasoning_effort="{effort}" --sandbox {mode} --full-auto --skip-git-repo-check 2>/dev/null` followed by the prompt content and `CODEX_PROMPT_EOF` on its own line
+3. Run: `codex exec -m {model} --config model_reasoning_effort="{effort}" --sandbox {mode} --full-auto --skip-git-repo-check '{prompt}' 2>/dev/null` with the prompt as a positional argument
 4. Summarize output and offer resume
 
 ## Session Management
 
 ### Resume
 ```bash
-cat << 'CODEX_PROMPT_EOF' | codex exec --skip-git-repo-check resume --last 2>/dev/null
-{prompt}
-CODEX_PROMPT_EOF
+codex exec --skip-git-repo-check resume --last '{prompt}' 2>/dev/null
 ```
 No config flags on resume unless user explicitly specifies model or reasoning. The resumed session inherits its original settings.
 

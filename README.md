@@ -46,6 +46,22 @@ rm -rf /tmp/skill-codex-experts
 - Codex configured with valid credentials
 - Verify: `codex --version`
 
+### Required: Bash Permission
+
+Codex experts run as background subagents via the Task tool. Background subagents auto-deny any Bash command not explicitly permitted. Add this to your **global** `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(codex:*)"
+    ]
+  }
+}
+```
+
+> **Why `settings.json` and not `settings.local.json`?** Due to a [known Claude Code issue](https://github.com/anthropics/claude-code/issues/18950), subagents don't inherit permissions from `settings.local.json`. Only `settings.json` propagates correctly.
+
 ## Usage
 
 Expert routing is automatic based on your prompt:
