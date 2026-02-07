@@ -118,9 +118,19 @@ Claude Code <── synthesized summary ──────┘
 
 Thinking tokens (stderr) are suppressed by default with `2>/dev/null`. Ask Claude to show them if you need to debug Codex's reasoning.
 
+### Second Opinion
+
+When an expert recommends something with significant trade-offs, Claude will suggest a counterbalance expert. For example, if the architect recommends adding microservices, Claude offers the simplifier's take on whether the complexity is justified.
+
+Natural pairings: architect/simplifier, implementer/code-reviewer, code-reviewer/security-analyst, scope-analyst/plan-reviewer. The second expert receives the first expert's key findings so it knows what it's evaluating.
+
+### Critical Evaluation
+
+Claude treats Codex output as a colleague's opinion, not an authority. If Codex produces something Claude knows is incorrect (stale APIs, wrong model names, outdated practices), Claude will push back, provide evidence, and let you decide.
+
 ### Session Resume
 
-Say "codex resume" to continue the last session. The resumed session inherits its original model, reasoning, and sandbox settings.
+Say "codex resume" to continue the last session, or resume a specific session by ID for targeted follow-ups. Sessions are stored under `~/.codex/sessions/` and inherit their original model, reasoning, and sandbox settings.
 
 ### Switch Expert
 

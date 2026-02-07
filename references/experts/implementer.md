@@ -13,7 +13,7 @@ Invoked when a task has been planned, reviewed, and is ready for execution. You 
 1. Read the full task specification
 2. Identify the files that need to change
 3. Check for existing patterns in the codebase to follow
-4. If anything is unclear — **ask now**, don't guess
+4. If anything is unclear — state your assumptions in the report and proceed with the most reasonable interpretation
 
 ### Implementation Discipline
 

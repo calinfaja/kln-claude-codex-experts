@@ -64,7 +64,9 @@ Construct the Codex input by combining:
 
 Dispatch the codex command using the **Task tool** (`subagent_type: Bash`). This runs in a subagent so codex output stays isolated from the main conversation.
 
-**IMPORTANT**: Pass the prompt as a positional argument (single-quoted), NOT via heredoc (`<<'EOF'`) or pipe (`cat ... |`). Heredoc and pipe syntax cause the `Bash(codex:*)` permission pattern to fail in background subagents because the permission matcher sees `cat` or the multi-line heredoc delimiter as the command, not `codex`.
+**IMPORTANT**: Do NOT use heredoc (`<<'EOF'`) or pipe (`cat ... |`) to pass prompts. These cause the `Bash(codex:*)` permission pattern to fail in background subagents because the permission matcher sees `cat` or the heredoc delimiter as the command, not `codex`.
+
+Write the combined prompt to `/tmp/codex-prompt.txt` using the Write tool **before** dispatching the Task. This avoids quoting issues with expert prompts that contain apostrophes.
 
 ```
 Task tool:
@@ -77,10 +79,10 @@ Task tool:
       --sandbox {sandbox_mode} \
       --full-auto \
       --skip-git-repo-check \
-      '{combined_prompt}' 2>/dev/null
+      "$(cat /tmp/codex-prompt.txt)" 2>/dev/null
 ```
 
-If the prompt contains single quotes, escape them as `'\''` or write the prompt to a temp file first, then use `"$(cat /tmp/codex-prompt.txt)"` as the argument.
+`"$(cat /tmp/codex-prompt.txt)"` is a positional argument (command substitution), not a pipe, so it matches the `Bash(codex:*)` permission pattern.
 
 Always use `--skip-git-repo-check`. Always append `2>/dev/null` to suppress thinking tokens unless user requests them.
 
@@ -91,7 +93,30 @@ Always use `--skip-git-repo-check`. Always append `2>/dev/null` to suppress thin
 After the Task agent returns:
 1. Present the structured output (verdicts, ratings, findings) in Claude's voice
 2. Preserve any tables, checklists, or severity ratings from the expert's response format
-3. Inform the user: "You can resume this session with 'codex resume' or ask for a different expert's perspective."
+3. Suggest a second opinion when the expert's recommendation involves a significant trade-off. Use this pairing table to pick the natural counterbalance:
+
+| Expert used | Suggest second opinion from | When |
+|-------------|----------------------------|------|
+| `architect` | `simplifier` | Recommends new layers, services, or abstractions |
+| `simplifier` | `architect` | Proposes removing something that may exist for structural reasons |
+| `implementer` | `code-reviewer` | After implementation is done |
+| `code-reviewer` | `security-analyst` | Findings touch auth, input handling, or data flow |
+| `scope-analyst` | `plan-reviewer` | Scope looks large or ambiguous |
+| `security-analyst` | `implementer` | After identifying fixes that need to be applied |
+
+   Format: "The [expert] suggests [summary]. Want a second opinion from the [counterbalance] to [reason]?"
+
+   If the user accepts, follow the Switch Expert flow (new session, not resume) and prepend the first expert's key findings to the second expert's prompt so it knows what it's evaluating. Example combined prompt:
+   ```
+   {counterbalance expert prompt from references/experts/}
+   ---
+   A previous [expert] analysis recommended: [key findings summary]
+   ---
+   Evaluate whether this recommendation is justified. {user's original task}
+   ```
+
+   Skip the suggestion when the output is straightforward, low-stakes, or the user already asked for a specific expert only.
+4. Inform the user: "You can resume this session with 'codex resume' or ask for a different expert's perspective."
 
 ## Plain Codex Mode (No Expert)
 
@@ -99,16 +124,20 @@ When no expert matches, fall back to original behavior:
 
 1. Ask model + reasoning effort via `AskUserQuestion` (single prompt, two questions)
 2. Select sandbox mode for the task (default: `read-only`)
-3. Run: `codex exec -m {model} --config model_reasoning_effort="{effort}" --sandbox {mode} --full-auto --skip-git-repo-check '{prompt}' 2>/dev/null` with the prompt as a positional argument
+3. Write prompt to `/tmp/codex-prompt.txt`, then run: `codex exec -m {model} --config model_reasoning_effort="{effort}" --sandbox {mode} --full-auto --skip-git-repo-check "$(cat /tmp/codex-prompt.txt)" 2>/dev/null`
 4. Summarize output and offer resume
 
 ## Session Management
 
 ### Resume
 ```bash
-codex exec --skip-git-repo-check resume --last '{prompt}' 2>/dev/null
+# Resume most recent session (from current working directory):
+codex exec --skip-git-repo-check resume --last '{follow-up prompt}' 2>/dev/null
+
+# Resume a specific session by ID:
+codex exec --skip-git-repo-check resume {SESSION_ID} '{follow-up prompt}' 2>/dev/null
 ```
-No config flags on resume unless user explicitly specifies model or reasoning. The resumed session inherits its original settings.
+Use `--last` for quick follow-ups on the most recent session. Use a session ID when multiple sessions exist (e.g., after a second opinion). Session IDs are stored under `~/.codex/sessions/`. The resumed session inherits its original model, reasoning, and sandbox settings.
 
 ### Switch Expert
 If user wants a different expert's take on the same topic:
@@ -157,6 +186,39 @@ If user wants a different expert's take on the same topic:
 **User**: "Use codex to refactor the logging module"
 **Route**: No expert match (general refactoring)
 **Action**: Ask model + reasoning, run plain codex exec with user prompt
+
+### 9. Second Opinion
+**User**: "Ask the architect to review our API gateway design"
+**Route**: `architect` (triggers: "architect", "design")
+**Action**: Read `references/experts/architect.md`, combine with task, run with reasoning=high, sandbox=read-only
+**Codex returns**: Recommends splitting into 3 microservices with an event bus
+**Second opinion trigger**: Architect recommends new layers → suggest simplifier
+**Claude says**: "The architect recommends splitting into 3 microservices with an event bus. Want a second opinion from the simplifier to check if that complexity is justified?"
+**User**: "yes"
+**Action**: Read `references/experts/simplifier.md`, prepend architect's key findings, run new session with the combined prompt
+
+## Critical Evaluation of Codex Output
+
+Codex is powered by OpenAI models with their own knowledge cutoffs and limitations. Treat Codex as a **colleague, not an authority**.
+
+### Guidelines
+- **Trust your own knowledge** when confident. If Codex claims something you know is incorrect, push back directly.
+- **Research disagreements** using WebSearch or documentation before accepting Codex's claims.
+- **Remember knowledge cutoffs** — Codex may not know about recent releases, APIs, or changes after its training data.
+- **Don't defer blindly** — evaluate Codex suggestions critically, especially regarding:
+  - Model names and capabilities
+  - Recent library versions or API changes
+  - Best practices that may have evolved
+
+### When Codex is Wrong
+1. State your disagreement clearly to the user
+2. Provide evidence (your own knowledge, web search, docs)
+3. Optionally resume the Codex session to discuss. Identify yourself as Claude so Codex knows it's a peer AI discussion:
+   ```bash
+   codex exec --skip-git-repo-check resume --last 'This is Claude following up. I disagree with [X] because [evidence]. What is your take on this?' 2>/dev/null
+   ```
+4. Frame disagreements as discussions, not corrections — either AI could be wrong
+5. Let the user decide how to proceed if there is genuine ambiguity
 
 ## Error Handling
 
