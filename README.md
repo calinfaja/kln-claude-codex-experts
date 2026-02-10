@@ -46,21 +46,27 @@ rm -rf /tmp/skill-codex-experts
 - Codex configured with valid credentials
 - Verify: `codex --version`
 
-### Required: Bash Permission
+### Required: Bash Permissions
 
-Codex experts run as background subagents via the Task tool. Background subagents auto-deny any Bash command not explicitly permitted. Add this to your **global** `~/.claude/settings.json`:
+Add **both** permissions to your **global** `~/.claude/settings.json`:
 
 ```json
 {
   "permissions": {
     "allow": [
-      "Bash(codex:*)"
+      "Bash(codex:*)",
+      "Bash(python3:*)"
     ]
   }
 }
 ```
 
+- `Bash(codex:*)` -- enables single-expert execution via foreground Task agent
+- `Bash(python3:*)` -- enables parallel multi-expert execution via Python subprocess wrapper
+
 > **Why `settings.json` and not `settings.local.json`?** Due to a [known Claude Code issue](https://github.com/anthropics/claude-code/issues/18950), subagents don't inherit permissions from `settings.local.json`. Only `settings.json` propagates correctly.
+
+> **Why `python3` for parallel?** Background Task agents (`run_in_background: true`) don't inherit `Bash(codex:*)` permissions. The parallel pattern uses `python3 subprocess.Popen` to launch multiple codex processes -- `Bash(python3:*)` is auto-approved even in background contexts.
 
 ## Usage
 
@@ -113,6 +119,23 @@ You ── "review auth for security" ──> Claude Code (sees your conversatio
 Claude Code <── synthesized summary ──────┘
   (only the summary enters your context)
 ```
+
+### Parallel Multi-Expert Execution
+
+Run multiple experts simultaneously for comprehensive reviews:
+
+```
+# Routes to 3 experts in parallel
+"Use 3 codex experts to review this PR: code-reviewer, architect, security"
+```
+
+Claude writes each expert's prompt to a file, then launches all codex processes in parallel via a Python subprocess wrapper. Results are collected from output files and presented as a consolidated report. A 3-expert parallel review typically completes in 5-6 minutes (wall clock), compared to 15-18 minutes sequential.
+
+**How parallel works under the hood:**
+1. Each expert prompt is written to `/tmp/codex-{role}-prompt.txt`
+2. A single `python3` command launches all codex processes via `subprocess.Popen`
+3. Each process reads its prompt from stdin and writes output to `/tmp/codex-{role}-output.txt`
+4. All processes run concurrently with full repo access via `--cd`
 
 ### Thinking Tokens
 

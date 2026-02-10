@@ -10,25 +10,29 @@ cp -r /tmp/skill-codex-experts/ ~/.claude/skills/codex-experts && \
 rm -rf /tmp/skill-codex-experts
 ```
 
-## Step 2: Add Bash permission for Codex
+## Step 2: Add Bash permissions for Codex
 
-Background subagents need explicit permission to run `codex` commands. Add `Bash(codex:*)` to your **global** `~/.claude/settings.json`:
+Background subagents need explicit permission to run `codex` commands. Add both `Bash(codex:*)` and `Bash(python3:*)` to your **global** `~/.claude/settings.json`:
 
 ```bash
-# If you already have a settings.json, add "Bash(codex:*)" to permissions.allow manually.
+# If you already have a settings.json, add both to permissions.allow manually.
 # If you don't have one yet, create it:
 cat > ~/.claude/settings.json << 'EOF'
 {
   "permissions": {
     "allow": [
-      "Bash(codex:*)"
+      "Bash(codex:*)",
+      "Bash(python3:*)"
     ]
   }
 }
 EOF
 ```
 
-If you already have a `~/.claude/settings.json`, merge the permission into your existing `permissions.allow` array. **Do not** put this in `settings.local.json` — subagents only inherit permissions from `settings.json` ([known issue](https://github.com/anthropics/claude-code/issues/18950)).
+- `Bash(codex:*)` — enables single-expert foreground execution via Task tool
+- `Bash(python3:*)` — enables parallel multi-expert execution via Python subprocess wrapper
+
+If you already have a `~/.claude/settings.json`, merge the permissions into your existing `permissions.allow` array. **Do not** put this in `settings.local.json` — subagents only inherit permissions from `settings.json` ([known issue](https://github.com/anthropics/claude-code/issues/18950)).
 
 ## Step 3: Verify
 
