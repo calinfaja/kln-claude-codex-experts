@@ -1,11 +1,11 @@
 ---
 name: codex-experts
-description: Use when the user asks to run Codex CLI, delegate to an expert (architect, security, reviewer, simplifier, implementer, researcher), or references OpenAI Codex for code analysis, codebase exploration, refactoring, security review, simplification, or automated editing. Triggers on codex, delegate, ask architect, review security, analyze scope, review plan, simplify, implement, explore codebase, find how X is used.
+description: Use when the user asks to run Codex CLI, delegate to an expert (architect, security, reviewer, simplifier, implementer, researcher, autoresearcher), or references OpenAI Codex for code analysis, codebase exploration, refactoring, security review, simplification, automated editing, or autonomous research. Triggers on codex, delegate, ask architect, review security, analyze scope, review plan, simplify, implement, explore codebase, find how X is used, autoresearch, iterate on, deep research, investigate, research topic, autonomous research.
 ---
 
 # Codex Experts Skill
 
-Extends Codex CLI with expert delegation. Routes tasks to specialized personas (architect, code-reviewer, security-analyst, plan-reviewer, scope-analyst, simplifier, implementer, researcher) that run as Codex sessions with tuned reasoning and structured output.
+Extends Codex CLI with expert delegation. Routes tasks to specialized personas (architect, code-reviewer, security-analyst, plan-reviewer, scope-analyst, simplifier, implementer, researcher, autoresearcher) that run as Codex sessions with tuned reasoning and structured output.
 
 ## Expert Routing Table
 
@@ -21,8 +21,11 @@ Match the user's task against these patterns. If no expert matches, run plain Co
 | `simplifier` | simplify, reduce complexity, clean up, redundant, over-engineered | medium | read-only |
 | `implementer` | implement task, build feature, execute plan, write the code, do the work | high | workspace-write |
 | `researcher` | explore codebase, find files, trace function, map dependencies, gather context, how is X used | high | read-only |
+| `autoresearcher` | autoresearch, iterate on, deep research, investigate, research topic, autonomous research | high | read-only |
 
-**Sandbox override**: If the user says "fix", "implement", "apply", or "change" -> use `workspace-write` instead of `read-only`. Exception: `simplifier` stays `read-only` (advisory only, never modifies code).
+**Sandbox override**: If the user says "fix", "implement", "apply", or "change" -> use `workspace-write` instead of `read-only`. Exception: `simplifier` and `autoresearcher` stay `read-only` (advisory/research only, never modify code).
+
+**Autoresearcher note**: Always `read-only`. Iterates on its own research depth, not on code changes. User specifies: research topic, file scope, and optionally iteration count (default 10) or a research goal for early stopping. Output is a comprehensive technical report.
 
 ## Execution Model
 
@@ -40,7 +43,7 @@ Follow these steps to build and execute a Codex command:
 ### Step 1: Determine Parameters
 
 1. **Expert**: Match task against routing table. If ambiguous, ask using `AskUserQuestion` with the top 2 candidates.
-2. **Model**: Default to `gpt-5.3-codex` unless the user specifies a different model. Available models: `gpt-5.3-codex` (latest, recommended), `gpt-5.2-codex`, `gpt-5`. Only ask the user if they haven't specified a preference.
+2. **Model**: Default to `gpt-5.3-codex` for coding experts (implementer, code-reviewer, simplifier). Use `gpt-5.4` for research and analysis experts (autoresearcher, architect, researcher, scope-analyst, plan-reviewer, security-analyst). `gpt-5.3-codex` is best for code generation and editing; `gpt-5.4` is the flagship model, best for reasoning, research, and general-purpose analysis. Override if user specifies a different model.
 3. **Reasoning effort**: Use the expert's default from the routing table. Override only if user specifies.
 4. **Sandbox**: Use routing table default. Override to `workspace-write` if implementation mode detected.
 
@@ -66,7 +69,7 @@ Dispatch the codex command using the **Task tool** (`subagent_type: Bash`). This
 
 **IMPORTANT**: Do NOT use heredoc (`<<'EOF'`) or pipe (`cat ... |`) to pass prompts. These cause the `Bash(codex:*)` permission pattern to fail because the permission matcher sees `cat` or the heredoc delimiter as the command, not `codex`.
 
-Write the combined prompt to `/tmp/codex-prompt.txt` using the Write tool **before** dispatching the Task. This avoids quoting issues with expert prompts that contain apostrophes.
+Generate a timestamp: `TS=$(date +%Y%m%d-%H%M%S)`. Write the combined prompt to `/tmp/codex-{expert}-{TS}-prompt.txt` using the Write tool **before** dispatching the Task. This avoids quoting issues with expert prompts that contain apostrophes and prevents collisions across runs.
 
 #### Single Expert (foreground Task agent)
 
@@ -83,30 +86,32 @@ Task tool:
       --sandbox {sandbox_mode} \
       --full-auto \
       --skip-git-repo-check \
-      "$(cat /tmp/codex-prompt.txt)" 2>/dev/null
+      "$(cat /tmp/codex-{expert}-{TS}-prompt.txt)" 2>/dev/null
 
-    If the command fails with "Argument list too long", pipe via stdin instead:
-    cat /tmp/codex-prompt.txt | codex exec -m {model} \
+    If the command fails with "Argument list too long", use stdin redirection instead:
+    codex exec -m {model} \
       --config model_reasoning_effort="{effort}" \
       --sandbox {sandbox_mode} \
       --full-auto \
       --skip-git-repo-check \
-      - 2>/dev/null
+      - < /tmp/codex-{expert}-{TS}-prompt.txt 2>/dev/null
 ```
 
-`"$(cat /tmp/codex-prompt.txt)"` is a positional argument (command substitution), not a pipe, so it matches the `Bash(codex:*)` permission pattern. For large prompts (>100KB, e.g. full PR diffs), the shell may reject the expansion with "Argument list too long" — the stdin fallback (`-` flag) handles this.
+`"$(cat /tmp/codex-{expert}-{TS}-prompt.txt)"` is a positional argument (command substitution), not a pipe, so it matches the `Bash(codex:*)` permission pattern. For large prompts (>100KB, e.g. full PR diffs), the shell may reject the expansion with "Argument list too long" — the stdin fallback (`-` flag) handles this.
 
 #### Multiple Experts in Parallel (Python subprocess)
 
 Background Task agents (`run_in_background: true`) do **not** inherit `Bash(codex:*)` permissions. To run multiple experts in parallel, use a Python subprocess wrapper via `Bash(run_in_background: true)`. The `Bash(python3:*)` permission is auto-approved and bypasses the background limitation.
 
-1. Write each expert's combined prompt to a separate file: `/tmp/codex-{expert}-prompt.txt`
-2. Run a single background Bash command with Python:
+1. Generate a timestamp for this run: `TS=$(date +%Y%m%d-%H%M%S)`
+2. Write each expert's combined prompt to a separate file: `/tmp/codex-{expert}-{TS}-prompt.txt`
+3. Run a single background Bash command with Python:
 
 ```
 Bash tool (run_in_background: true, timeout: 600000):
   python3 -c "
   import subprocess, time
+  ts = '{TS}'  # same timestamp Claude used when writing prompt files
   start = time.time()
   procs = []
   configs = [
@@ -115,27 +120,28 @@ Bash tool (run_in_background: true, timeout: 600000):
       ('{expert3}', '{effort3}'),
   ]
   for role, effort in configs:
+      out_file = f'/tmp/codex-{role}-{ts}-output.txt'
       p = subprocess.Popen(
           ['codex', 'exec', '-m', '{model}',
            '--config', 'model_reasoning_effort=' + effort,
            '--sandbox', '{sandbox_mode}', '--full-auto', '--skip-git-repo-check',
            '--cd', '{working_dir}',
-           '-o', '/tmp/codex-' + role + '-output.txt',
+           '-o', out_file,
            '-'],
-          stdin=open('/tmp/codex-' + role + '-prompt.txt'),
+          stdin=open(f'/tmp/codex-{role}-{ts}-prompt.txt'),
           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
       )
-      procs.append((role, p))
-      print(f'{role}: launched PID={p.pid}')
+      procs.append((role, p, out_file))
+      print(f'{role}: launched PID={p.pid} -> {out_file}')
   print(f'All launched in {time.time()-start:.1f}s, waiting...')
-  for role, p in procs:
+  for role, p, out_file in procs:
       rc = p.wait()
-      print(f'{role}: done exit={rc} at {time.time()-start:.0f}s')
+      print(f'{role}: done exit={rc} at {time.time()-start:.0f}s -> {out_file}')
   print(f'ALL DONE in {time.time()-start:.0f}s')
   "
 ```
 
-3. Read output files (`/tmp/codex-{expert}-output.txt`) when the background command completes.
+4. Read output files (`/tmp/codex-{expert}-{TS}-output.txt`) when the background command completes.
 
 **Why this works**: `subprocess.Popen` launches codex as child processes that read prompts from stdin (file objects). Each runs in its own process with full repo access via `--cd`. The `-o` flag writes the final response to a file for easy retrieval.
 
@@ -158,6 +164,7 @@ After the Task agent returns:
 | `code-reviewer` | `security-analyst` | Findings touch auth, input handling, or data flow |
 | `scope-analyst` | `plan-reviewer` | Scope looks large or ambiguous |
 | `security-analyst` | `implementer` | After identifying fixes that need to be applied |
+| `autoresearcher` | `architect` | Research reveals structural patterns worth evaluating for design quality |
 
    Format: "The [expert] suggests [summary]. Want a second opinion from the [counterbalance] to [reason]?"
 
@@ -179,7 +186,7 @@ When no expert matches, fall back to original behavior:
 
 1. Ask model + reasoning effort via `AskUserQuestion` (single prompt, two questions)
 2. Select sandbox mode for the task (default: `read-only`)
-3. Write prompt to `/tmp/codex-prompt.txt`, then run: `codex exec -m {model} --config model_reasoning_effort="{effort}" --sandbox {mode} --full-auto --skip-git-repo-check "$(cat /tmp/codex-prompt.txt)" 2>/dev/null`
+3. Write prompt to `/tmp/codex-plain-{TS}-prompt.txt`, then run: `codex exec -m {model} --config model_reasoning_effort="{effort}" --sandbox {mode} --full-auto --skip-git-repo-check "$(cat /tmp/codex-plain-{TS}-prompt.txt)" 2>/dev/null`
 4. Summarize output and offer resume
 
 ## Session Management
@@ -245,9 +252,27 @@ If user wants a different expert's take on the same topic:
 ### 9. Parallel Multi-Expert Review
 **User**: "Use 3 codex experts to review this PR: code-reviewer, architect, security"
 **Route**: Multiple experts detected
-**Action**: Write each expert prompt to `/tmp/codex-{role}-prompt.txt`, launch Python subprocess wrapper via `Bash(run_in_background: true)` with all 3 codex processes. Read `/tmp/codex-{role}-output.txt` files when complete. Present consolidated findings.
+**Action**: Write each expert prompt to `/tmp/codex-{role}-{TS}-prompt.txt`, launch Python subprocess wrapper via `Bash(run_in_background: true)` with all 3 codex processes. Read `/tmp/codex-{role}-{TS}-output.txt` files when complete. Present consolidated findings.
 
-### 10. Second Opinion
+### 10. Autonomous Research (Single Topic)
+**User**: "Use codex to autoresearch the authentication flow — map all entry points, middleware, and session handling"
+**Route**: `autoresearcher` (triggers: "autoresearch")
+**Action**: Read `references/experts/autoresearcher.md`, combine with topic and scope, run with reasoning=high, sandbox=read-only. Codex iteratively explores the codebase — each iteration digs deeper, follows new leads, refines findings. Returns a comprehensive technical report with file paths, code snippets, call graphs, and dependency maps.
+
+### 11. Parallel Autoresearch (Multiple Topics)
+**User**: "Use codex to autoresearch these 3 topics in parallel, 10 iterations each:
+1. Authentication flow in src/auth/ — entry points, middleware, session handling
+2. Database access patterns in src/models/ — queries, transactions, connection pooling
+3. Error handling in src/api/ — error types, propagation, user-facing messages"
+**Route**: `autoresearcher` x3 (parallel)
+**Action**: Write 3 autoresearcher prompts to `/tmp/codex-autoresearcher-{topic}-{TS}-prompt.txt`, each with its own research topic and scope. Launch via Python subprocess wrapper (same pattern as parallel multi-expert). Each Codex process runs its research loop independently in read-only mode. Read `/tmp/codex-autoresearcher-{topic}-{TS}-output.txt` files when complete. Present consolidated research report across all topics.
+
+### 12. Guided Autoresearch (Claude-Steered)
+**User**: "Use codex to autoresearch the payment integration, guide each step"
+**Route**: `autoresearcher` in guided mode (trigger: "guide each step")
+**Action**: Claude dispatches Codex for ONE research iteration at a time. Codex explores, returns current findings and remaining gaps. Claude reviews, suggests where to dig next, dispatches next iteration. Repeat until research is comprehensive or user stops.
+
+### 13. Second Opinion
 **User**: "Ask the architect to review our API gateway design"
 **Route**: `architect` (triggers: "architect", "design")
 **Action**: Read `references/experts/architect.md`, combine with task, run with reasoning=high, sandbox=read-only
