@@ -68,12 +68,24 @@ Construct the Codex input by combining:
 
 #### Diff-Aware Review Context
 
-For review experts (`code-reviewer`, `adversarial-reviewer`, `security-analyst`), automatically compute and append the relevant diff before dispatching. This gives Codex the changes upfront instead of making it discover them:
+For review experts (`code-reviewer`, `adversarial-reviewer`, `security-analyst`), automatically compute and append the relevant diff before dispatching. This gives Codex the changes upfront instead of making it discover them.
 
-- **User mentions a base branch** (e.g. "review against main"): `git diff {base}...HEAD`
-- **User mentions staged changes**: `git diff --cached`
-- **User mentions a specific PR**: `git diff {base}...HEAD` for the PR's base branch
-- **Default** (no scope specified): `git diff HEAD` (all uncommitted changes)
+**Scope detection** -- infer the right diff from the user's prompt:
+
+| User intent | How to detect | Diff command |
+|---|---|---|
+| Review uncommitted work | Dirty working tree + no other scope mentioned | `git diff HEAD` |
+| Review latest commit | "latest commit", "last commit", clean tree after commit | `git diff HEAD~1..HEAD` |
+| Review last N commits | "last 3 commits", "recent changes" | `git diff HEAD~N..HEAD` |
+| Review against a branch | "against main", "compared to develop", "this branch" | `git diff {base}...HEAD` |
+| Review a PR | "this PR", "the PR" | `git diff {base}...HEAD` (detect base from `gh pr view`) |
+| Review staged changes | "staged", "what I'm about to commit" | `git diff --cached` |
+| Review entire branch/feature | "whole branch", "all branch work", "everything on this branch", "full implementation" | `git log main..HEAD --oneline` to list commits, then `git diff main...HEAD` for the full diff |
+
+**When ambiguous or diff is empty**: Do NOT silently default to an empty diff. Instead:
+1. Run `git status --short` and `git log --oneline -3` to understand the repo state
+2. If the working tree is clean and the user said "review the changes", use `git diff HEAD~1..HEAD` (the most recent commit)
+3. If still unclear, ask the user via `AskUserQuestion`: "Which changes should I review?" with options like "Latest commit", "All commits on this branch vs main", "Entire branch implementation", "Uncommitted changes"
 
 Append the diff to the combined prompt after the task:
 ```
@@ -85,7 +97,7 @@ Append the diff to the combined prompt after the task:
 {diff output}
 ```
 
-If the diff is larger than 80KB, truncate with a note: `[Diff truncated at 80KB — Codex will explore remaining files directly]`. If the diff is empty, note that and let Codex explore the working tree itself.
+If the diff is larger than 80KB, truncate with a note: `[Diff truncated at 80KB — Codex will explore remaining files directly]`.
 
 ### Step 4: Execute via Task Tool
 

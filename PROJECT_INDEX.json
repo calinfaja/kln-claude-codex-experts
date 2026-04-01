@@ -7,7 +7,7 @@
     "generated": "2026-04-01",
     "stats": {
       "total_files": 15,
-      "total_lines": 1728,
+      "total_lines": 1740,
       "has_executable_code": false,
       "type": "prompt-only skill"
     }
@@ -15,7 +15,7 @@
   "structure": {
     "root": [
       {"file": "README.md", "lines": 215, "purpose": "Overview, benefits, quick install"},
-      {"file": "SKILL.md", "lines": 404, "purpose": "Full skill spec: routing, execution, examples"},
+      {"file": "SKILL.md", "lines": 416, "purpose": "Full skill spec: routing, execution, examples"},
       {"file": "INSTALL.md", "lines": 51, "purpose": "3-step setup guide"},
       {"file": "LICENSE", "lines": 21, "purpose": "MIT license"}
     ],

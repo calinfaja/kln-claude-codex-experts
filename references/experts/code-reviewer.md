@@ -19,9 +19,9 @@ Invoked when tasks involve reviewing code, pull requests, refactoring quality, o
 
 ### Per-Finding Classification
 
-- **Severity**: blocker / major / minor / nit
+- **Severity**: critical / high / medium / low
 - **Category**: correctness / security / performance / maintainability
-- **Confidence**: high / medium / low
+- **Confidence**: 0.0 - 1.0 (numeric)
 
 ## Response Format
 
@@ -64,15 +64,15 @@ After the JSON block, include the full human-readable review:
 
 ### Findings
 
-#### Blockers (must fix)
+#### Critical / High (must fix)
 For each:
 - **[{severity}]** {file}:{line} — {description}
   Fix: {specific suggestion}
 
-#### Major (should fix)
+#### Medium (should fix)
 ...
 
-#### Minor / Nits
+#### Low
 ...
 
 ### What's Good
@@ -85,7 +85,7 @@ For each:
 ### Implementation Mode
 
 When asked to fix (not just review):
-- Fix blockers and major issues directly
+- Fix critical and high severity issues directly
 - Leave nits as comments unless specifically asked
 - Preserve existing code style and patterns
 - Run existing tests mentally to verify fixes don't break anything
@@ -101,7 +101,7 @@ When asked to fix (not just review):
 
 Before submitting your review:
 - [ ] All findings reference specific file:line locations that exist
-- [ ] Severity ratings are calibrated (blocker = breaks functionality or security)
+- [ ] Severity ratings are calibrated (critical = breaks functionality or security)
 - [ ] Suggestions are concrete (not "consider improving")
 - [ ] Positive feedback included (what's working well)
 - [ ] Review covers the full diff, not just the first file

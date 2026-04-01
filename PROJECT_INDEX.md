@@ -26,7 +26,7 @@ skill-codex-experts/
         └── review-output.schema.json
 ```
 
-15 files | ~1,728 lines | No executable code -- prompt-only skill
+15 files | ~1,740 lines | No executable code -- prompt-only skill
 
 ## What This Is
 
@@ -129,7 +129,7 @@ Each topic prompt -> /tmp/codex-autoresearcher-{topic}-{TS}-prompt.txt
 | File | Audience | Content |
 |------|----------|---------|
 | README.md (215 lines) | New users | Problem statement, expert table, install, usage examples |
-| SKILL.md (404 lines) | Claude Code | Full skill spec: routing table, command builder, execution model, error handling |
+| SKILL.md (416 lines) | Claude Code | Full skill spec: routing table, command builder, execution model, error handling |
 | INSTALL.md (51 lines) | Installers | git clone, permissions setup, troubleshooting |
 
 ## Credits
