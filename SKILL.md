@@ -1,11 +1,11 @@
 ---
 name: codex-experts
-description: Use when the user asks to run Codex CLI, delegate to an expert (architect, security, reviewer, simplifier, implementer, researcher, autoresearcher), or references OpenAI Codex for code analysis, codebase exploration, refactoring, security review, simplification, automated editing, or autonomous research. Triggers on codex, delegate, ask architect, review security, analyze scope, review plan, simplify, implement, explore codebase, find how X is used, autoresearch, iterate on, deep research, investigate, research topic, autonomous research.
+description: Use when the user asks to run Codex CLI, delegate to an expert (architect, security, reviewer, adversarial reviewer, simplifier, implementer, researcher, autoresearcher), or references OpenAI Codex for code analysis, codebase exploration, refactoring, security review, adversarial review, simplification, automated editing, or autonomous research. Triggers on codex, delegate, ask architect, review security, adversarial review, challenge this, pressure test, devil's advocate, analyze scope, review plan, simplify, implement, explore codebase, find how X is used, autoresearch, iterate on, deep research, investigate, research topic, autonomous research, codex status, codex cancel.
 ---
 
 # Codex Experts Skill
 
-Extends Codex CLI with expert delegation. Routes tasks to specialized personas (architect, code-reviewer, security-analyst, plan-reviewer, scope-analyst, simplifier, implementer, researcher, autoresearcher) that run as Codex sessions with tuned reasoning and structured output.
+Extends Codex CLI with expert delegation. Routes tasks to specialized personas (architect, code-reviewer, adversarial-reviewer, security-analyst, plan-reviewer, scope-analyst, simplifier, implementer, researcher, autoresearcher) that run as Codex sessions with tuned reasoning and structured output.
 
 ## Expert Routing Table
 
@@ -15,6 +15,7 @@ Match the user's task against these patterns. If no expert matches, run plain Co
 |--------|-----------------|-----------|-----------------|
 | `architect` | system design, architecture, tradeoffs, scaling, component boundaries, database schema | high | read-only |
 | `code-reviewer` | review code, PR review, code quality, review changes, review diff | medium | read-only |
+| `adversarial-reviewer` | adversarial review, challenge this, pressure test, devil's advocate, break confidence, ship or no-ship | high | read-only |
 | `security-analyst` | security, vulnerabilities, auth, OWASP, threat model, secrets, injection | xhigh | read-only |
 | `plan-reviewer` | review plan, validate plan, check plan, RFC review | medium | read-only |
 | `scope-analyst` | scope, requirements, ambiguity, pre-planning, analyze request, what's missing | medium | read-only |
@@ -23,9 +24,11 @@ Match the user's task against these patterns. If no expert matches, run plain Co
 | `researcher` | explore codebase, find files, trace function, map dependencies, gather context, how is X used | high | read-only |
 | `autoresearcher` | autoresearch, iterate on, deep research, investigate, research topic, autonomous research | high | read-only |
 
-**Sandbox override**: If the user says "fix", "implement", "apply", or "change" -> use `workspace-write` instead of `read-only`. Exception: `simplifier` and `autoresearcher` stay `read-only` (advisory/research only, never modify code).
+**Sandbox override**: If the user says "fix", "implement", "apply", or "change" -> use `workspace-write` instead of `read-only`. Exception: `simplifier`, `adversarial-reviewer`, and `autoresearcher` stay `read-only` (advisory/research only, never modify code).
 
 **Autoresearcher note**: Always `read-only`. Iterates on its own research depth, not on code changes. User specifies: research topic, file scope, and optionally iteration count (default 10) or a research goal for early stopping. Output is a comprehensive technical report.
+
+**Adversarial-reviewer note**: Always `read-only`. Breaks confidence in changes rather than validating them. Outputs structured JSON findings alongside human-readable summary. Use `code-reviewer` for balanced assessment, `adversarial-reviewer` to pressure-test before shipping.
 
 ## Execution Model
 
@@ -43,7 +46,7 @@ Follow these steps to build and execute a Codex command:
 ### Step 1: Determine Parameters
 
 1. **Expert**: Match task against routing table. If ambiguous, ask using `AskUserQuestion` with the top 2 candidates.
-2. **Model**: Default to `gpt-5.3-codex` for coding experts (implementer, code-reviewer, simplifier). Use `gpt-5.4` for research and analysis experts (autoresearcher, architect, researcher, scope-analyst, plan-reviewer, security-analyst). `gpt-5.3-codex` is best for code generation and editing; `gpt-5.4` is the flagship model, best for reasoning, research, and general-purpose analysis. Override if user specifies a different model.
+2. **Model**: Default to `gpt-5.3-codex` for coding experts (implementer, code-reviewer, simplifier) and `gpt-5.4` for all other experts (autoresearcher, architect, adversarial-reviewer, researcher, scope-analyst, plan-reviewer, security-analyst). `gpt-5.3-codex` is the top coding model; `gpt-5.4` is the flagship for reasoning, research, and general-purpose analysis (1M context, computer use, tool search). If user specifies a model (e.g. `gpt-5.4-mini`, `gpt-5.4-nano`, `spark`), use that instead. Map `spark` to `gpt-5.3-codex-spark`.
 3. **Reasoning effort**: Use the expert's default from the routing table. Override only if user specifies.
 4. **Sandbox**: Use routing table default. Override to `workspace-write` if implementation mode detected.
 
@@ -62,6 +65,27 @@ Construct the Codex input by combining:
 2. A separator: `---`
 3. The user's actual task/question
 4. Any relevant context (current file, diff, error output)
+
+#### Diff-Aware Review Context
+
+For review experts (`code-reviewer`, `adversarial-reviewer`, `security-analyst`), automatically compute and append the relevant diff before dispatching. This gives Codex the changes upfront instead of making it discover them:
+
+- **User mentions a base branch** (e.g. "review against main"): `git diff {base}...HEAD`
+- **User mentions staged changes**: `git diff --cached`
+- **User mentions a specific PR**: `git diff {base}...HEAD` for the PR's base branch
+- **Default** (no scope specified): `git diff HEAD` (all uncommitted changes)
+
+Append the diff to the combined prompt after the task:
+```
+{expert prompt}
+---
+{user's task}
+---
+## Changes to Review
+{diff output}
+```
+
+If the diff is larger than 80KB, truncate with a note: `[Diff truncated at 80KB — Codex will explore remaining files directly]`. If the diff is empty, note that and let Codex explore the working tree itself.
 
 ### Step 4: Execute via Task Tool
 
@@ -149,6 +173,44 @@ Always use `--skip-git-repo-check`. Always append `2>/dev/null` (single expert) 
 
 **Fallback**: If the Task tool is unavailable, run directly via Bash. The skill works either way — Task tool is preferred, not required.
 
+### Step 4b: Job Registry
+
+After launching each Codex process, record it in `/tmp/codex-experts-jobs.json` (one JSON object per line, append-only):
+
+```bash
+echo '{"id":"'$TS'","expert":"'$ROLE'","pid":'$PID',"started":"'$(date -Iseconds)'","status":"running","output_file":"/tmp/codex-'$ROLE'-'$TS'-output.txt","prompt_file":"/tmp/codex-'$ROLE'-'$TS'-prompt.txt"}' >> /tmp/codex-experts-jobs.json
+```
+
+For the parallel Python wrapper, write one line per expert after launching.
+
+After a process completes, update its status by rewriting the line (or let the status check infer it from PID liveness).
+
+#### Job Status ("codex status")
+
+When the user asks "codex status" or "what's running":
+
+1. Read `/tmp/codex-experts-jobs.json`
+2. For each entry with `"status":"running"`, check if PID is alive: `kill -0 $PID 2>/dev/null`
+3. Present a table:
+
+```
+| Expert | Started | Status | Output |
+|--------|---------|--------|--------|
+| security-analyst | 14:32:05 | running (PID 12345) | /tmp/codex-security-analyst-...-output.txt |
+| code-reviewer | 14:32:05 | completed | /tmp/codex-code-reviewer-...-output.txt |
+```
+
+4. For completed jobs, offer to read the output file.
+
+#### Job Cancel ("codex cancel")
+
+When the user asks "codex cancel" or "kill codex":
+
+1. Read `/tmp/codex-experts-jobs.json` for running jobs
+2. If multiple running, ask which to cancel via `AskUserQuestion`
+3. Kill the process: `kill $PID`
+4. Inform the user
+
 ### Step 5: Synthesize
 
 After the Task agent returns:
@@ -162,6 +224,7 @@ After the Task agent returns:
 | `simplifier` | `architect` | Proposes removing something that may exist for structural reasons |
 | `implementer` | `code-reviewer` | After implementation is done |
 | `code-reviewer` | `security-analyst` | Findings touch auth, input handling, or data flow |
+| `adversarial-reviewer` | `implementer` | After identifying issues that need fixing |
 | `scope-analyst` | `plan-reviewer` | Scope looks large or ambiguous |
 | `security-analyst` | `implementer` | After identifying fixes that need to be applied |
 | `autoresearcher` | `architect` | Research reveals structural patterns worth evaluating for design quality |
@@ -244,22 +307,37 @@ If user wants a different expert's take on the same topic:
 **Route**: `researcher` (triggers: "find", "how is X used", "map")
 **Action**: Read `references/experts/researcher.md`, combine with task, run with reasoning=high, sandbox=read-only. Returns structured report with file paths, line numbers, signatures, and call graph.
 
-### 8. Plain Codex (No Expert)
+### 8. Adversarial Review
+**User**: "Pressure test the payment changes before we ship"
+**Route**: `adversarial-reviewer` (triggers: "pressure test")
+**Action**: Read `references/experts/adversarial-reviewer.md`, compute diff via `git diff HEAD`, combine with task and diff, run with reasoning=high, sandbox=read-only. Returns structured JSON findings + human-readable summary.
+
+### 9. Job Status
+**User**: "codex status"
+**Route**: Job status check
+**Action**: Read `/tmp/codex-experts-jobs.json`, check PID liveness for running jobs, present table of all recent jobs with status.
+
+### 10. Job Cancel
+**User**: "codex cancel the security review"
+**Route**: Job cancel
+**Action**: Read `/tmp/codex-experts-jobs.json`, find matching running job, `kill $PID`, inform user.
+
+### 11. Plain Codex (No Expert)
 **User**: "Use codex to refactor the logging module"
 **Route**: No expert match (general refactoring)
 **Action**: Ask model + reasoning, run plain codex exec with user prompt
 
-### 9. Parallel Multi-Expert Review
+### 12. Parallel Multi-Expert Review
 **User**: "Use 3 codex experts to review this PR: code-reviewer, architect, security"
 **Route**: Multiple experts detected
 **Action**: Write each expert prompt to `/tmp/codex-{role}-{TS}-prompt.txt`, launch Python subprocess wrapper via `Bash(run_in_background: true)` with all 3 codex processes. Read `/tmp/codex-{role}-{TS}-output.txt` files when complete. Present consolidated findings.
 
-### 10. Autonomous Research (Single Topic)
+### 13. Autonomous Research (Single Topic)
 **User**: "Use codex to autoresearch the authentication flow — map all entry points, middleware, and session handling"
 **Route**: `autoresearcher` (triggers: "autoresearch")
 **Action**: Read `references/experts/autoresearcher.md`, combine with topic and scope, run with reasoning=high, sandbox=read-only. Codex iteratively explores the codebase — each iteration digs deeper, follows new leads, refines findings. Returns a comprehensive technical report with file paths, code snippets, call graphs, and dependency maps.
 
-### 11. Parallel Autoresearch (Multiple Topics)
+### 14. Parallel Autoresearch (Multiple Topics)
 **User**: "Use codex to autoresearch these 3 topics in parallel, 10 iterations each:
 1. Authentication flow in src/auth/ — entry points, middleware, session handling
 2. Database access patterns in src/models/ — queries, transactions, connection pooling
@@ -267,12 +345,12 @@ If user wants a different expert's take on the same topic:
 **Route**: `autoresearcher` x3 (parallel)
 **Action**: Write 3 autoresearcher prompts to `/tmp/codex-autoresearcher-{topic}-{TS}-prompt.txt`, each with its own research topic and scope. Launch via Python subprocess wrapper (same pattern as parallel multi-expert). Each Codex process runs its research loop independently in read-only mode. Read `/tmp/codex-autoresearcher-{topic}-{TS}-output.txt` files when complete. Present consolidated research report across all topics.
 
-### 12. Guided Autoresearch (Claude-Steered)
+### 15. Guided Autoresearch (Claude-Steered)
 **User**: "Use codex to autoresearch the payment integration, guide each step"
 **Route**: `autoresearcher` in guided mode (trigger: "guide each step")
 **Action**: Claude dispatches Codex for ONE research iteration at a time. Codex explores, returns current findings and remaining gaps. Claude reviews, suggests where to dig next, dispatches next iteration. Repeat until research is comprehensive or user stops.
 
-### 13. Second Opinion
+### 16. Second Opinion
 **User**: "Ask the architect to review our API gateway design"
 **Route**: `architect` (triggers: "architect", "design")
 **Action**: Read `references/experts/architect.md`, combine with task, run with reasoning=high, sandbox=read-only

@@ -6,9 +6,12 @@ Run expert analysis (security audits, architecture reviews, code reviews) throug
 
 - **Zero context cost**: Codex runs as a separate process. Its output stays in a Task subagent — your Claude conversation stays clean.
 - **Full codebase access**: Codex reads your repo directly via its sandbox. No need to paste files or reference paths — it explores on its own.
-- **Expert-tuned reasoning**: Each expert runs with calibrated reasoning effort (security=xhigh, architecture=high, reviews=medium) so you're not overpaying for simple tasks.
-- **Two models, best of both**: Claude orchestrates (conversation-aware routing), Codex executes (deep analysis with its own tool use and web search).
+- **Expert-tuned reasoning**: Each expert runs with calibrated reasoning effort (security=xhigh, architecture/adversarial=high, reviews=medium) so you're not overpaying for simple tasks.
+- **Two model tiers**: `gpt-5.3-codex` for coding experts (implementer, code-reviewer, simplifier), `gpt-5.4` for analysis experts (architect, adversarial-reviewer, security-analyst, researcher, autoresearcher, scope-analyst, plan-reviewer). Override per-request with `gpt-5.4-mini`, `gpt-5.4-nano`, or `spark`.
 - **Full Codex features**: `codex exec` reads your `~/.codex/config.toml` — MCP servers, feature flags, profiles, `AGENTS.md`, web search all work. If you've configured Codex with extra tools (DB explorers, Jira, Sentry, etc.), experts get them automatically.
+- **Structured review output**: Review experts emit JSON conforming to `references/schemas/review-output.schema.json` alongside human-readable summaries.
+- **Diff-aware reviews**: Review experts automatically receive the relevant `git diff` so Codex starts with the changes instead of discovering them.
+- **Job tracking**: Background jobs are logged to `/tmp/codex-experts-jobs.json`. Check with "codex status", cancel with "codex cancel".
 
 ## Experts
 
@@ -17,6 +20,7 @@ Run expert analysis (security audits, architecture reviews, code reviews) throug
 | **Architect** | Evaluating design decisions, scaling strategies, component boundaries | `Ask the codex architect if splitting payments into a microservice is worth it` |
 | **Code Reviewer** | PR reviews, code quality checks, catching bugs before merge | `Use codex to review the changes in src/api/ for correctness and performance` |
 | **Security Analyst** | Auth flows, input validation, OWASP compliance, threat modeling | `Use codex to security review the auth module and session handling` |
+| **Adversarial Reviewer** | Pressure-testing changes before shipping, devil's advocate, breaking confidence | `Pressure test the payment changes before we ship` |
 | **Plan Reviewer** | Validating implementation plans before writing code | `Use codex to review my plan for migrating to PostgreSQL` |
 | **Scope Analyst** | Clarifying ambiguous requirements before planning | `Use codex to analyze the scope of "add multi-tenant support"` |
 | **Simplifier** | Finding unnecessary complexity, dead code, over-engineering | `Use codex to find what can be simplified in src/services/` |
@@ -98,8 +102,17 @@ Expert routing is automatic based on your prompt:
 # Routes to researcher (read-only, returns structured report)
 "Use codex to find how authenticate() is called and map the auth flow"
 
+# Routes to adversarial-reviewer (high reasoning, always read-only)
+"Pressure test the auth changes before we ship"
+
 # Routes to autoresearcher (deep iterative research, read-only)
 "Use codex to autoresearch the authentication flow — map all entry points and session handling"
+
+# Check running codex jobs
+"codex status"
+
+# Cancel a running job
+"codex cancel the security review"
 
 # Routes to autoresearcher x3 in parallel
 "Use codex to autoresearch these 3 topics in parallel:
@@ -173,7 +186,7 @@ Thinking tokens (stderr) are suppressed by default with `2>/dev/null`. Ask Claud
 
 When an expert recommends something with significant trade-offs, Claude will suggest a counterbalance expert. For example, if the architect recommends adding microservices, Claude offers the simplifier's take on whether the complexity is justified.
 
-Natural pairings: architect/simplifier, implementer/code-reviewer, code-reviewer/security-analyst, scope-analyst/plan-reviewer, autoresearcher/architect. The second expert receives the first expert's key findings so it knows what it's evaluating.
+Natural pairings: architect/simplifier, implementer/code-reviewer, code-reviewer/security-analyst, adversarial-reviewer/implementer, scope-analyst/plan-reviewer, autoresearcher/architect. The second expert receives the first expert's key findings so it knows what it's evaluating.
 
 ### Critical Evaluation
 

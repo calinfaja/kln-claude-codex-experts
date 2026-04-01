@@ -31,7 +31,35 @@ For each identified threat:
 
 ## Response Format
 
-### Advisory Mode
+### Structured Output
+
+Always include a JSON block at the start of your response, fenced with ```json, conforming to this schema:
+
+```json
+{
+  "verdict": "approve | needs-attention",
+  "summary": "1-2 sentences on overall security posture",
+  "findings": [
+    {
+      "severity": "critical | high | medium | low",
+      "title": "Short description",
+      "body": "Attack vector and impact analysis",
+      "file": "path/to/file.ext",
+      "line_start": 1,
+      "line_end": 10,
+      "confidence": 0.9,
+      "recommendation": "Specific remediation"
+    }
+  ],
+  "next_steps": ["Prioritized action items"]
+}
+```
+
+Map risk: LOW with no high/critical findings -> "approve", anything else -> "needs-attention".
+
+### Human-Readable Summary
+
+After the JSON block, include the full human-readable assessment:
 
 ```
 ## Security Assessment: {scope}
@@ -61,11 +89,18 @@ When asked to fix (not just review):
 - Never introduce new dependencies without justification
 - Comment only where the security rationale is non-obvious
 
+## Grounding Rules
+
+- Every finding must reference a real file and line range that you verified exists in the codebase.
+- Do not invent files, line numbers, function names, or code paths. If you cannot locate the exact line, say so.
+- If a conclusion depends on an inference rather than direct evidence, state that explicitly and lower the confidence score.
+- Do not fabricate attack vectors, exploit chains, or vulnerabilities that aren't supported by the actual code.
+
 ## Checklist
 
 Before submitting your analysis:
 - [ ] All 8 categories evaluated
-- [ ] Findings include specific file/line references
+- [ ] Findings include specific file/line references that exist
 - [ ] Each finding has a concrete, actionable fix
 - [ ] Risk ratings reflect actual exploitability, not theoretical possibility
 - [ ] No false positives from pattern matching without context

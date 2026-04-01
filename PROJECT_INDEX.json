@@ -4,38 +4,51 @@
     "description": "Claude Code skill for expert delegation to OpenAI Codex CLI",
     "license": "MIT",
     "author": "Calin Faja",
-    "generated": "2026-03-14",
+    "generated": "2026-04-01",
     "stats": {
-      "total_files": 13,
-      "total_lines": 1320,
+      "total_files": 15,
+      "total_lines": 1728,
       "has_executable_code": false,
       "type": "prompt-only skill"
     }
   },
   "structure": {
     "root": [
-      {"file": "README.md", "lines": 199, "purpose": "Overview, benefits, quick install"},
-      {"file": "SKILL.md", "lines": 327, "purpose": "Full skill spec: routing, execution, examples"},
+      {"file": "README.md", "lines": 215, "purpose": "Overview, benefits, quick install"},
+      {"file": "SKILL.md", "lines": 404, "purpose": "Full skill spec: routing, execution, examples"},
       {"file": "INSTALL.md", "lines": 51, "purpose": "3-step setup guide"},
-      {"file": "LICENSE", "lines": 22, "purpose": "MIT license"}
+      {"file": "LICENSE", "lines": 21, "purpose": "MIT license"}
     ],
     "references/experts": [
+      {"file": "adversarial-reviewer.md", "lines": 104, "purpose": "Adversarial/devil's advocate reviewer prompt"},
       {"file": "architect.md", "lines": 71, "purpose": "System design expert prompt"},
       {"file": "autoresearcher.md", "lines": 170, "purpose": "Autonomous iterative research expert prompt"},
-      {"file": "code-reviewer.md", "lines": 72, "purpose": "Code quality reviewer prompt"},
+      {"file": "code-reviewer.md", "lines": 107, "purpose": "Code quality reviewer prompt (structured JSON + grounding rules)"},
       {"file": "implementer.md", "lines": 86, "purpose": "Task execution expert prompt"},
       {"file": "plan-reviewer.md", "lines": 83, "purpose": "Plan validation expert prompt"},
       {"file": "researcher.md", "lines": 89, "purpose": "Codebase exploration expert prompt"},
       {"file": "scope-analyst.md", "lines": 83, "purpose": "Requirement analysis expert prompt"},
-      {"file": "security-analyst.md", "lines": 71, "purpose": "Security audit expert prompt"},
+      {"file": "security-analyst.md", "lines": 106, "purpose": "Security audit expert prompt (structured JSON + grounding rules)"},
       {"file": "simplifier.md", "lines": 72, "purpose": "Simplification advisor prompt"}
+    ],
+    "references/schemas": [
+      {"file": "review-output.schema.json", "lines": 66, "purpose": "JSON schema for structured review output (code-reviewer, adversarial-reviewer, security-analyst)"}
     ]
   },
   "experts": [
     {
+      "name": "adversarial-reviewer",
+      "reasoning": "high",
+      "sandbox": "read-only",
+      "model": "gpt-5.4",
+      "triggers": ["adversarial review", "challenge this", "pressure test", "devil's advocate", "break confidence", "ship or no-ship"],
+      "framework": "Skepticism-first ship/no-ship verdict with structured JSON output"
+    },
+    {
       "name": "architect",
       "reasoning": "high",
       "sandbox": "read-only",
+      "model": "gpt-5.4",
       "triggers": ["system design", "architecture", "tradeoffs", "scaling", "component boundaries", "database schema"],
       "framework": "6-axis design evaluation"
     },
@@ -43,6 +56,7 @@
       "name": "autoresearcher",
       "reasoning": "high",
       "sandbox": "read-only",
+      "model": "gpt-5.4",
       "triggers": ["autoresearch", "iterate on", "deep research", "investigate", "research topic", "autonomous research"],
       "framework": "Iterative exploration loop with completeness calibration"
     },
@@ -50,13 +64,15 @@
       "name": "code-reviewer",
       "reasoning": "medium",
       "sandbox": "read-only",
+      "model": "gpt-5.3-codex",
       "triggers": ["review code", "PR review", "code quality", "review changes", "review diff"],
-      "framework": "P0-P3 severity classification"
+      "framework": "P0-P3 severity classification with structured JSON output"
     },
     {
       "name": "implementer",
       "reasoning": "high",
       "sandbox": "workspace-write",
+      "model": "gpt-5.3-codex",
       "triggers": ["implement task", "build feature", "execute plan", "write the code", "do the work"],
       "framework": "Quality gates: completeness, correctness, cleanliness"
     },
@@ -64,6 +80,7 @@
       "name": "plan-reviewer",
       "reasoning": "medium",
       "sandbox": "read-only",
+      "model": "gpt-5.4",
       "triggers": ["review plan", "validate plan", "check plan", "RFC review"],
       "framework": "Can I implement from this? test"
     },
@@ -71,6 +88,7 @@
       "name": "researcher",
       "reasoning": "high",
       "sandbox": "read-only",
+      "model": "gpt-5.4",
       "triggers": ["explore codebase", "find files", "trace function", "map dependencies", "gather context", "how is X used"],
       "framework": "Systematic search with file:line:signature format"
     },
@@ -78,6 +96,7 @@
       "name": "scope-analyst",
       "reasoning": "medium",
       "sandbox": "read-only",
+      "model": "gpt-5.4",
       "triggers": ["scope", "requirements", "ambiguity", "pre-planning", "analyze request", "what's missing"],
       "framework": "Intent classification + hidden requirement surfacing"
     },
@@ -85,13 +104,15 @@
       "name": "security-analyst",
       "reasoning": "xhigh",
       "sandbox": "read-only",
+      "model": "gpt-5.4",
       "triggers": ["security", "vulnerabilities", "auth", "OWASP", "threat model", "secrets", "injection"],
-      "framework": "OWASP 8-point checklist"
+      "framework": "OWASP 8-point checklist with structured JSON output"
     },
     {
       "name": "simplifier",
       "reasoning": "medium",
       "sandbox": "read-only",
+      "model": "gpt-5.3-codex",
       "triggers": ["simplify", "reduce complexity", "clean up", "redundant", "over-engineered"],
       "framework": "Complexity category detection, advisory only"
     }
@@ -114,6 +135,12 @@
       "output_files": "/tmp/codex-autoresearcher-{topic}-{TS}-output.txt",
       "sandbox": "read-only",
       "note": "Each topic runs independently; wall clock = slowest topic"
+    },
+    "job_tracking": {
+      "registry": "/tmp/codex-experts-jobs.json",
+      "fields": ["id", "expert", "pid", "started", "status", "output_file", "prompt_file"],
+      "status_command": "codex status",
+      "cancel_command": "codex cancel"
     }
   },
   "second_opinion_pairs": [
@@ -121,6 +148,7 @@
     {"primary": "simplifier", "counterbalance": "architect", "when": "Proposes removing structural elements"},
     {"primary": "implementer", "counterbalance": "code-reviewer", "when": "After implementation"},
     {"primary": "code-reviewer", "counterbalance": "security-analyst", "when": "Findings touch auth or data flow"},
+    {"primary": "adversarial-reviewer", "counterbalance": "implementer", "when": "After identifying issues that need fixing"},
     {"primary": "scope-analyst", "counterbalance": "plan-reviewer", "when": "Scope is large or ambiguous"},
     {"primary": "security-analyst", "counterbalance": "implementer", "when": "Fixes need to be applied"},
     {"primary": "autoresearcher", "counterbalance": "architect", "when": "Research reveals structural patterns worth evaluating"}
@@ -132,9 +160,10 @@
     "sessions": "~/.codex/sessions/"
   },
   "models": {
-    "default": "gpt-5.3-codex",
-    "available": ["gpt-5.4", "gpt-5.3-codex", "gpt-5.2-codex", "gpt-5"],
-    "context_window": "400k tokens (gpt-5.3-codex)"
+    "coding_default": "gpt-5.3-codex",
+    "analysis_default": "gpt-5.4",
+    "available": ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.3-codex", "gpt-5.3-codex-spark"],
+    "context_window": "1M tokens (gpt-5.4), 400k tokens (gpt-5.3-codex)"
   },
   "dependencies": ["codex CLI", "python3", "bash"]
 }
