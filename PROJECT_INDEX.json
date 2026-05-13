@@ -4,10 +4,10 @@
     "description": "Claude Code skill for expert delegation to OpenAI Codex CLI",
     "license": "MIT",
     "author": "Calin Faja",
-    "generated": "2026-04-01",
+    "generated": "2026-05-13",
     "stats": {
-      "total_files": 15,
-      "total_lines": 1740,
+      "total_files": 17,
+      "total_lines": 2023,
       "has_executable_code": false,
       "type": "prompt-only skill"
     }
@@ -15,7 +15,7 @@
   "structure": {
     "root": [
       {"file": "README.md", "lines": 215, "purpose": "Overview, benefits, quick install"},
-      {"file": "SKILL.md", "lines": 416, "purpose": "Full skill spec: routing, execution, examples"},
+      {"file": "SKILL.md", "lines": 414, "purpose": "Full skill spec: routing, execution, examples"},
       {"file": "INSTALL.md", "lines": 51, "purpose": "3-step setup guide"},
       {"file": "LICENSE", "lines": 21, "purpose": "MIT license"}
     ],
@@ -40,7 +40,7 @@
       "name": "adversarial-reviewer",
       "reasoning": "high",
       "sandbox": "read-only",
-      "model": "gpt-5.4",
+      "model": "gpt-5.5",
       "triggers": ["adversarial review", "challenge this", "pressure test", "devil's advocate", "break confidence", "ship or no-ship"],
       "framework": "Skepticism-first ship/no-ship verdict with structured JSON output"
     },
@@ -48,7 +48,7 @@
       "name": "architect",
       "reasoning": "high",
       "sandbox": "read-only",
-      "model": "gpt-5.4",
+      "model": "gpt-5.5",
       "triggers": ["system design", "architecture", "tradeoffs", "scaling", "component boundaries", "database schema"],
       "framework": "6-axis design evaluation"
     },
@@ -56,7 +56,7 @@
       "name": "autoresearcher",
       "reasoning": "high",
       "sandbox": "read-only",
-      "model": "gpt-5.4",
+      "model": "gpt-5.5",
       "triggers": ["autoresearch", "iterate on", "deep research", "investigate", "research topic", "autonomous research"],
       "framework": "Iterative exploration loop with completeness calibration"
     },
@@ -80,7 +80,7 @@
       "name": "plan-reviewer",
       "reasoning": "medium",
       "sandbox": "read-only",
-      "model": "gpt-5.4",
+      "model": "gpt-5.5",
       "triggers": ["review plan", "validate plan", "check plan", "RFC review"],
       "framework": "Can I implement from this? test"
     },
@@ -88,7 +88,7 @@
       "name": "researcher",
       "reasoning": "high",
       "sandbox": "read-only",
-      "model": "gpt-5.4",
+      "model": "gpt-5.5",
       "triggers": ["explore codebase", "find files", "trace function", "map dependencies", "gather context", "how is X used"],
       "framework": "Systematic search with file:line:signature format"
     },
@@ -96,7 +96,7 @@
       "name": "scope-analyst",
       "reasoning": "medium",
       "sandbox": "read-only",
-      "model": "gpt-5.4",
+      "model": "gpt-5.5",
       "triggers": ["scope", "requirements", "ambiguity", "pre-planning", "analyze request", "what's missing"],
       "framework": "Intent classification + hidden requirement surfacing"
     },
@@ -104,7 +104,7 @@
       "name": "security-analyst",
       "reasoning": "xhigh",
       "sandbox": "read-only",
-      "model": "gpt-5.4",
+      "model": "gpt-5.5",
       "triggers": ["security", "vulnerabilities", "auth", "OWASP", "threat model", "secrets", "injection"],
       "framework": "OWASP 8-point checklist with structured JSON output"
     },
@@ -121,7 +121,7 @@
     "single_expert": {
       "method": "Task tool (foreground)",
       "prompt_file": "/tmp/codex-{expert}-{TS}-prompt.txt",
-      "command_pattern": "codex exec -m {model} --config model_reasoning_effort=\"{effort}\" --sandbox {mode} --full-auto --skip-git-repo-check \"$(cat /tmp/codex-{expert}-{TS}-prompt.txt)\" 2>/dev/null"
+      "command_pattern": "codex exec -m {model} --config model_reasoning_effort=\"{effort}\" --sandbox {mode} --skip-git-repo-check \"$(cat /tmp/codex-{expert}-{TS}-prompt.txt)\" 2>/dev/null"
     },
     "parallel_multi_expert": {
       "method": "python3 subprocess.Popen (background Bash)",
@@ -161,9 +161,9 @@
   },
   "models": {
     "coding_default": "gpt-5.3-codex",
-    "analysis_default": "gpt-5.4",
-    "available": ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.3-codex", "gpt-5.3-codex-spark"],
-    "context_window": "1M tokens (gpt-5.4), 400k tokens (gpt-5.3-codex)"
+    "analysis_default": "gpt-5.5",
+    "available": ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark"],
+    "context_window": "1M tokens (gpt-5.5, gpt-5.4), 400k tokens (gpt-5.3-codex)"
   },
   "dependencies": ["codex CLI", "python3", "bash"]
 }

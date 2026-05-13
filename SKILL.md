@@ -46,7 +46,7 @@ Follow these steps to build and execute a Codex command:
 ### Step 1: Determine Parameters
 
 1. **Expert**: Match task against routing table. If ambiguous, ask using `AskUserQuestion` with the top 2 candidates.
-2. **Model**: Default to `gpt-5.3-codex` for coding experts (implementer, code-reviewer, simplifier) and `gpt-5.4` for all other experts (autoresearcher, architect, adversarial-reviewer, researcher, scope-analyst, plan-reviewer, security-analyst). `gpt-5.3-codex` is the top coding model; `gpt-5.4` is the flagship for reasoning, research, and general-purpose analysis (1M context, computer use, tool search). If user specifies a model (e.g. `gpt-5.4-mini`, `gpt-5.4-nano`, `spark`), use that instead. Map `spark` to `gpt-5.3-codex-spark`.
+2. **Model**: Default to `gpt-5.3-codex` for coding experts (implementer, code-reviewer, simplifier) and `gpt-5.5` for all other experts (autoresearcher, architect, adversarial-reviewer, researcher, scope-analyst, plan-reviewer, security-analyst). `gpt-5.3-codex` is the top coding model; `gpt-5.5` is the newest frontier model for reasoning, research, computer use, and knowledge work (1M context). If user specifies a model (e.g. `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `spark`), use that instead. Map `spark` to `gpt-5.3-codex-spark`.
 3. **Reasoning effort**: Use the expert's default from the routing table. Override only if user specifies.
 4. **Sandbox**: Use routing table default. Override to `workspace-write` if implementation mode detected.
 
@@ -120,7 +120,6 @@ Task tool:
     codex exec -m {model} \
       --config model_reasoning_effort="{effort}" \
       --sandbox {sandbox_mode} \
-      --full-auto \
       --skip-git-repo-check \
       "$(cat /tmp/codex-{expert}-{TS}-prompt.txt)" 2>/dev/null
 
@@ -128,7 +127,6 @@ Task tool:
     codex exec -m {model} \
       --config model_reasoning_effort="{effort}" \
       --sandbox {sandbox_mode} \
-      --full-auto \
       --skip-git-repo-check \
       - < /tmp/codex-{expert}-{TS}-prompt.txt 2>/dev/null
 ```
@@ -160,7 +158,7 @@ Bash tool (run_in_background: true, timeout: 600000):
       p = subprocess.Popen(
           ['codex', 'exec', '-m', '{model}',
            '--config', 'model_reasoning_effort=' + effort,
-           '--sandbox', '{sandbox_mode}', '--full-auto', '--skip-git-repo-check',
+           '--sandbox', '{sandbox_mode}', '--skip-git-repo-check',
            '--cd', '{working_dir}',
            '-o', out_file,
            '-'],
@@ -261,7 +259,7 @@ When no expert matches, fall back to original behavior:
 
 1. Ask model + reasoning effort via `AskUserQuestion` (single prompt, two questions)
 2. Select sandbox mode for the task (default: `read-only`)
-3. Write prompt to `/tmp/codex-plain-{TS}-prompt.txt`, then run: `codex exec -m {model} --config model_reasoning_effort="{effort}" --sandbox {mode} --full-auto --skip-git-repo-check "$(cat /tmp/codex-plain-{TS}-prompt.txt)" 2>/dev/null`
+3. Write prompt to `/tmp/codex-plain-{TS}-prompt.txt`, then run: `codex exec -m {model} --config model_reasoning_effort="{effort}" --sandbox {mode} --skip-git-repo-check "$(cat /tmp/codex-plain-{TS}-prompt.txt)" 2>/dev/null`
 4. Summarize output and offer resume
 
 ## Session Management
@@ -399,7 +397,7 @@ Codex is powered by OpenAI models with their own knowledge cutoffs and limitatio
 
 - **Non-zero exit**: Stop and report the error. Ask user before retrying.
 - **Missing expert file**: Fall back to plain Codex mode. Inform user the expert reference wasn't found.
-- **Permission gates**: Before using `--full-auto`, `--sandbox danger-full-access`, ask user permission via `AskUserQuestion` unless already granted.
+- **Permission gates**: Before using `--sandbox workspace-write`, `--sandbox danger-full-access`, or `--dangerously-bypass-approvals-and-sandbox`, ask user permission via `AskUserQuestion` unless already granted.
 - **Stderr warnings**: If output includes warnings or partial results, summarize and ask how to proceed.
 
 ## Boundaries

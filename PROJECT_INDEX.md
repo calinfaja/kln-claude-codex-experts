@@ -44,15 +44,15 @@ A Claude Code skill that delegates analysis tasks to OpenAI Codex CLI via specia
 
 | Expert | File | Lines | Model | Reasoning | Sandbox | Trigger Keywords |
 |--------|------|-------|-------|-----------|---------|-----------------|
-| adversarial-reviewer | references/experts/adversarial-reviewer.md | 104 | gpt-5.4 | high | read-only | adversarial review, challenge this, pressure test, devil's advocate |
-| architect | references/experts/architect.md | 71 | gpt-5.4 | high | read-only | system design, architecture, tradeoffs, scaling |
-| autoresearcher | references/experts/autoresearcher.md | 170 | gpt-5.4 | high | read-only | autoresearch, iterate on, deep research, investigate |
+| adversarial-reviewer | references/experts/adversarial-reviewer.md | 104 | gpt-5.5 | high | read-only | adversarial review, challenge this, pressure test, devil's advocate |
+| architect | references/experts/architect.md | 71 | gpt-5.5 | high | read-only | system design, architecture, tradeoffs, scaling |
+| autoresearcher | references/experts/autoresearcher.md | 170 | gpt-5.5 | high | read-only | autoresearch, iterate on, deep research, investigate |
 | code-reviewer | references/experts/code-reviewer.md | 107 | gpt-5.3-codex | medium | read-only | review code, PR review, code quality |
 | implementer | references/experts/implementer.md | 86 | gpt-5.3-codex | high | workspace-write | implement, build feature, execute plan |
-| plan-reviewer | references/experts/plan-reviewer.md | 83 | gpt-5.4 | medium | read-only | review plan, validate plan, RFC review |
-| researcher | references/experts/researcher.md | 89 | gpt-5.4 | high | read-only | explore codebase, trace function, map dependencies |
-| scope-analyst | references/experts/scope-analyst.md | 83 | gpt-5.4 | medium | read-only | scope, requirements, ambiguity, pre-planning |
-| security-analyst | references/experts/security-analyst.md | 106 | gpt-5.4 | xhigh | read-only | security, vulnerabilities, auth, OWASP |
+| plan-reviewer | references/experts/plan-reviewer.md | 83 | gpt-5.5 | medium | read-only | review plan, validate plan, RFC review |
+| researcher | references/experts/researcher.md | 89 | gpt-5.5 | high | read-only | explore codebase, trace function, map dependencies |
+| scope-analyst | references/experts/scope-analyst.md | 83 | gpt-5.5 | medium | read-only | scope, requirements, ambiguity, pre-planning |
+| security-analyst | references/experts/security-analyst.md | 106 | gpt-5.5 | xhigh | read-only | security, vulnerabilities, auth, OWASP |
 | simplifier | references/experts/simplifier.md | 72 | gpt-5.3-codex | medium | read-only | simplify, reduce complexity, over-engineered |
 
 **Sandbox override**: "fix", "implement", "apply", "change" -> workspace-write (except simplifier, adversarial-reviewer, and autoresearcher, always read-only)
@@ -102,7 +102,7 @@ Each topic prompt -> /tmp/codex-autoresearcher-{topic}-{TS}-prompt.txt
 ## Key Features
 
 - **Auto-routing**: Keywords in user prompt select the expert automatically
-- **Model defaults**: `gpt-5.3-codex` for coding experts (implementer, code-reviewer, simplifier); `gpt-5.4` for all others. Override per-request with `gpt-5.4-mini`, `gpt-5.4-nano`, or `spark`.
+- **Model defaults**: `gpt-5.3-codex` for coding experts (implementer, code-reviewer, simplifier); `gpt-5.5` for all others. Override per-request with `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, or `spark`.
 - **Structured JSON output**: Review experts (code-reviewer, adversarial-reviewer, security-analyst) produce JSON conforming to `references/schemas/review-output.schema.json`
 - **Diff-aware reviews**: Review experts automatically receive the relevant git diff appended to their prompt
 - **Job tracking**: All Codex processes are recorded in `/tmp/codex-experts-jobs.json` with status/cancel support

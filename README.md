@@ -7,7 +7,7 @@ Run expert analysis (security audits, architecture reviews, code reviews) throug
 - **Zero context cost**: Codex runs as a separate process. Its output stays in a Task subagent — your Claude conversation stays clean.
 - **Full codebase access**: Codex reads your repo directly via its sandbox. No need to paste files or reference paths — it explores on its own.
 - **Expert-tuned reasoning**: Each expert runs with calibrated reasoning effort (security=xhigh, architecture/adversarial=high, reviews=medium) so you're not overpaying for simple tasks.
-- **Two model tiers**: `gpt-5.3-codex` for coding experts (implementer, code-reviewer, simplifier), `gpt-5.4` for analysis experts (architect, adversarial-reviewer, security-analyst, researcher, autoresearcher, scope-analyst, plan-reviewer). Override per-request with `gpt-5.4-mini`, `gpt-5.4-nano`, or `spark`.
+- **Two model tiers**: `gpt-5.3-codex` for coding experts (implementer, code-reviewer, simplifier), `gpt-5.5` for analysis experts (architect, adversarial-reviewer, security-analyst, researcher, autoresearcher, scope-analyst, plan-reviewer). Override per-request with `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, or `spark`.
 - **Full Codex features**: `codex exec` reads your `~/.codex/config.toml` — MCP servers, feature flags, profiles, `AGENTS.md`, web search all work. If you've configured Codex with extra tools (DB explorers, Jira, Sentry, etc.), experts get them automatically.
 - **Structured review output**: Review experts emit JSON conforming to `references/schemas/review-output.schema.json` alongside human-readable summaries.
 - **Diff-aware reviews**: Review experts automatically receive the relevant `git diff` so Codex starts with the changes instead of discovering them.
